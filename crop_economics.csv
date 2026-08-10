@@ -1,0 +1,31 @@
+Crop,Season,Cost_per_acre,Market_price_per_kg,Yield_per_acre_kg
+Rice,Kharif,25000,22,2500
+Maize,Kharif,18000,20,2300
+Chickpea,Rabi,15000,55,800
+Kidneybeans,Kharif,20000,90,700
+Pigeonpeas,Kharif,16000,75,700
+Mothbeans,Kharif,10000,60,400
+Mungbean,Zaid,12000,80,500
+Blackgram,Kharif,12000,75,500
+Lentil,Rabi,13000,65,600
+Pomegranate,Annual,150000,80,4000
+Banana,Annual,80000,15,16000
+Mango,Annual,40000,40,4000
+Grapes,Annual,200000,50,8000
+Watermelon,Zaid,30000,8,12000
+Muskmelon,Zaid,25000,15,8000
+Apple,Annual,150000,80,5000
+Orange,Annual,60000,30,8000
+Papaya,Annual,60000,10,25000
+Coconut,Annual,25000,12,8000
+Cotton,Kharif,30000,60,1800
+Jute,Kharif,20000,45,1000
+Coffee,Annual,70000,150,800
+Sugarcane,Annual,35000,3.5,30000
+Groundnut,Kharif,22000,65,1200
+Cumbu,Kharif,12000,24,1100
+Pearl Millet,Kharif,12000,24,1100
+Ragi,Kharif,12000,32,1100
+Finger Millet,Kharif,12000,32,1100
+Turmeric,Annual,85000,85,2800
+Cashew,Annual,40000,115,800
