@@ -9,3 +9,4 @@ plotly>=5.0
 fpdf2>=2.7.0
 streamlit-searchbox>=0.1.0
 streamlit-js-eval>=0.1.5
+bcrypt>=4.0.0
