@@ -763,13 +763,10 @@ def render_app_footer():
     footer_html = """
     <div class="app-global-footer">
         <hr class="footer-divider" />
-        <div class="footer-content">
-            <span class="footer-brand">🌱 Smart Agriculture DSS</span>
-            <span class="footer-dot">•</span>
-            <span>AI-Powered Decision Support Engine</span>
-            <span class="footer-dot">•</span>
-            <span class="footer-disclaimer">Not a substitute for professional agricultural field advice</span>
-        </div>
+        <div class="footer-creator-text">Built &amp; Developed by <span class="footer-author-name">Tharanibalan B.</span></div>
+        <div class="footer-app-title">Smart Agriculture Decision Support System</div>
+        <div class="footer-copyright-text">© 2026 Tharanibalan B. All Rights Reserved.</div>
+        <div class="footer-disclaimer-note">Not a substitute for professional agricultural field advice.</div>
     </div>
     """
     st.markdown(footer_html, unsafe_allow_html=True)
@@ -996,33 +993,46 @@ with st.sidebar:
     /* Global App Footer */
     .app-global-footer {
         margin-top: 45px;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
         text-align: center;
-    }
-    .footer-divider {
-        border: none;
-        border-top: 1px solid rgba(255, 255, 255, 0.12);
-        margin-bottom: 16px;
-    }
-    .footer-content {
-        font-size: 0.82rem;
-        color: #9ca3af;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
     }
-    .footer-brand {
-        font-weight: 700;
+    .footer-divider {
+        width: 100%;
+        border: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        margin-bottom: 14px;
+    }
+    .footer-creator-text {
+        font-size: 0.96rem;
+        font-weight: 600;
+        color: #f3f4f6;
+        letter-spacing: 0.2px;
+    }
+    .footer-author-name {
         color: #34d399;
+        font-weight: 700;
     }
-    .footer-dot {
-        color: #4b5563;
+    .footer-app-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #9ca3af;
+        letter-spacing: 0.3px;
     }
-    .footer-disclaimer {
-        font-style: italic;
+    .footer-copyright-text {
+        font-size: 0.78rem;
         color: #6b7280;
+    }
+    .footer-disclaimer-note {
+        font-size: 0.74rem;
+        font-style: italic;
+        color: #4b5563;
+        margin-top: 2px;
     }
     </style>
     """, unsafe_allow_html=True)
