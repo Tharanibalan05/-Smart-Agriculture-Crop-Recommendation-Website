@@ -170,20 +170,24 @@ def _normalize_history_file():
         df.to_csv(HISTORY_PATH, index=False)
 
 
-def append_prediction_history(row: dict = None, clear: bool = False):
+def append_prediction_history(row: dict = None, clear: bool = False, user_email: str = None):
     """Append a single prediction row (dict) to HISTORY_PATH as CSV.
 
-    If clear=True the history file is removed (cleared).
+    If clear=True and user_email is provided, clear ONLY that user's history records.
+    If clear=True and user_email is None/empty, legacy complete wipe occurs.
     """
     import os
     import pandas as pd
 
     if clear:
-        try:
-            if os.path.exists(HISTORY_PATH):
-                os.remove(HISTORY_PATH)
-        except Exception:
-            pass
+        if user_email and str(user_email).strip():
+            clear_user_history(user_email)
+        else:
+            try:
+                if os.path.exists(HISTORY_PATH):
+                    os.remove(HISTORY_PATH)
+            except Exception:
+                pass
         return
 
     if not row:
@@ -194,8 +198,8 @@ def append_prediction_history(row: dict = None, clear: bool = False):
         _normalize_history_file()
 
     df_row = pd.DataFrame([row])
-    if 'user_email' not in df_row.columns or not df_row['user_email'].iloc[0]:
-        df_row['user_email'] = row.get('user_email') or 'guest@local'
+    raw_email = row.get('user_email') or user_email or 'guest@local'
+    df_row['user_email'] = str(raw_email).strip().lower()
 
     # Ensure all columns exist
     for c in HISTORY_COLUMNS:
@@ -211,22 +215,71 @@ def append_prediction_history(row: dict = None, clear: bool = False):
         df_row.to_csv(HISTORY_PATH, index=False)
 
 
-def load_history():
-    """Load history into a pandas DataFrame or return empty DataFrame if none."""
+def load_history(user_email: str = None):
+    """Load history into a pandas DataFrame.
+
+    If user_email is specified, filters records strictly by that user's email address.
+    If user_email is None or empty, returns an empty DataFrame for security.
+    """
     import os
     import pandas as pd
 
     if not os.path.exists(HISTORY_PATH):
-        return pd.DataFrame()
+        return pd.DataFrame(columns=HISTORY_COLUMNS)
+
+    _normalize_history_file()
+
+    try:
+        df = pd.read_csv(HISTORY_PATH)
+        for c in HISTORY_COLUMNS:
+            if c not in df.columns:
+                df[c] = None
+
+        if not user_email or not str(user_email).strip():
+            # Security requirement: unauthenticated/unspecified users receive no records
+            return pd.DataFrame(columns=HISTORY_COLUMNS)
+
+        target_email = str(user_email).strip().lower()
+        filtered_df = df[df['user_email'].astype(str).str.strip().str.lower() == target_email].reset_index(drop=True)
+        return filtered_df
+    except Exception:
+        return pd.DataFrame(columns=HISTORY_COLUMNS)
+
+
+def load_user_history(user_email: str):
+    """Dedicated function to load history filtered strictly by user_email."""
+    return load_history(user_email=user_email)
+
+
+def clear_user_history(user_email: str):
+    """Remove ONLY the specified user's prediction history records from HISTORY_PATH."""
+    import os
+    import pandas as pd
+
+    if not user_email or not str(user_email).strip():
+        return
+
+    if not os.path.exists(HISTORY_PATH):
+        return
 
     _normalize_history_file()
 
     try:
         df = pd.read_csv(HISTORY_PATH)
         if 'user_email' not in df.columns:
-            df['user_email'] = 'guest@local'
-        return df
+            return
+
+        target_email = str(user_email).strip().lower()
+        remaining_df = df[df['user_email'].astype(str).str.strip().str.lower() != target_email].reset_index(drop=True)
+
+        for c in HISTORY_COLUMNS:
+            if c not in remaining_df.columns:
+                remaining_df[c] = None
+        remaining_df = remaining_df[HISTORY_COLUMNS]
+
+        remaining_df.to_csv(HISTORY_PATH, index=False)
     except Exception:
-        return pd.DataFrame()
+        pass
+
 
 

@@ -27,6 +27,8 @@ from utils import (
     get_breakeven_yield,
     append_prediction_history,
     load_history,
+    load_user_history,
+    clear_user_history,
 )
 import importlib
 import config
@@ -2384,10 +2386,25 @@ def page_prediction_history():
 
     st.header("📜 Saved Prediction History")
 
-    hist_df = load_history()
+    curr_user = get_current_user()
+    if not curr_user["is_logged_in"]:
+        st.warning("⚠️ **Authentication Required**: Please sign in to view your prediction history.")
+        render_empty_state(
+            title="Please sign in to view your prediction history.",
+            subtitle="Historical crop recommendations are securely stored per user account. Sign in with your email or Google account to access your saved records.",
+            icon="🔒",
+            button_label="🔑 Sign In Now",
+            target_page="🔑 Sign In",
+        )
+        render_app_footer()
+        return
+
+    user_email = curr_user["email"]
+    hist_df = load_user_history(user_email)
+
     if hist_df is None or hist_df.empty:
         render_empty_state(
-            title="No Saved Prediction Records",
+            title="No prediction history available yet.",
             subtitle="Your historical crop recommendation runs will be automatically logged here for easy tracking, CSV export, and record keeping.",
             icon="📜",
             button_label="🌾 Generate First Recommendation",
@@ -2396,23 +2413,27 @@ def page_prediction_history():
         render_app_footer()
         return
 
-    st.dataframe(hist_df, use_container_width=True)
+    # Hide 'user_email' column from the visible display table
+    display_df = hist_df.drop(columns=['user_email'], errors='ignore')
+
+    st.dataframe(display_df, use_container_width=True)
 
     h_col1, h_col2 = st.columns(2)
     with h_col1:
         csv_hist = hist_df.to_csv(index=False).encode('utf-8')
+        sanitized_name = (curr_user.get('name') or 'user').lower().replace(' ', '_')
         st.download_button(
             "📥 Download Complete History (CSV)",
             data=csv_hist,
-            file_name="prediction_history_export.csv",
+            file_name=f"prediction_history_{sanitized_name}.csv",
             mime="text/csv",
             use_container_width=True,
         )
 
     with h_col2:
         if st.button("🗑️ Clear History Records", use_container_width=True):
-            append_prediction_history(clear=True)
-            st.success("Prediction history cleared.")
+            clear_user_history(user_email)
+            st.success("Your prediction history has been cleared.")
             time.sleep(0.5)
             st.rerun()
 
