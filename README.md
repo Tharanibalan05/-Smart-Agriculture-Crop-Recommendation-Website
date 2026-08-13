@@ -193,3 +193,14 @@ The application will launch in your browser at `http://localhost:8501`.
 - **Soil Screening Disclaimer:** The soil screening engine provides rule-based screening from user-entered values. It is **not** a substitute for certified laboratory soil testing.
 - **Market Data:** Unless a live APMC market API is configured via `MARKET_API_URL`, economic prices are drawn from `crop_economics.csv` and labeled as `🟡 DEMO`.
 - **Decision Support Only:** This application provides advisory decision support. Commercial farming decisions should be validated with local agricultural extension officers.
+
+---
+
+## 🔒 Password Security
+
+- **Bcrypt Hashing:** Local passwords are stored using bcrypt with a minimum work factor (rounds) of 12.
+- **Zero Plaintext Storage:** Passwords are never stored in plaintext or logged in system logs, console output, or exceptions.
+- **Automatic Legacy Migration:** Legacy password formats (plaintext, MD5, SHA-1) are automatically upgraded to bcrypt upon successful user authentication.
+- **Unmigratable Hashes:** Legacy weak hashes where the original password is unavailable offline are marked to require a secure password reset (`password_needs_reset`).
+- **OAuth Isolation:** Google OAuth authentication remains separate from local password authentication.
+
