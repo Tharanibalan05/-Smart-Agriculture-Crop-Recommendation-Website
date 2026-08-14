@@ -69,9 +69,16 @@ from config import (
 # Initialize SQLite Users Database
 init_db()
 
+# Auto-patch Streamlit static files for PWA, robots.txt, sitemap.xml & SEO Head Tags
+try:
+    from patch_streamlit_pwa import patch_streamlit
+    patch_streamlit()
+except Exception as _patch_err:
+    pass
+
 # Page Configuration
 st.set_page_config(
-    page_title="Smart Agriculture Decision Support System",
+    page_title="Smart Agriculture | AI Crop Recommendation System",
     page_icon="🌱",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -89,9 +96,31 @@ def render_html(html_str: str):
 
 
 def inject_custom_css():
-    """Inject lightweight custom CSS animations and visual polish for a modern AI agriculture dashboard."""
-    # Register fallback PWA service worker
+    """Inject lightweight custom CSS animations, SEO tags, and visual polish for modern AI agriculture dashboard."""
+    # Register fallback PWA service worker and SEO head metadata
     render_html("""
+        <meta name="description" content="Smart Agriculture is an AI-powered crop recommendation and agricultural decision support system that analyzes soil nutrients, weather conditions, market prices, crop suitability, and agricultural risks to recommend suitable crops.">
+        <meta name="keywords" content="Smart Agriculture, AI Crop Recommendation, Crop Recommendation System, Agriculture Decision Support System, Smart Farming, Soil Health Analysis, Crop Suitability, Agricultural Risk Analysis, Machine Learning Agriculture">
+        <link rel="canonical" href="https://smart-agriculture-dss.onrender.com/">
+        <meta property="og:title" content="Smart Agriculture | AI Crop Recommendation System">
+        <meta property="og:description" content="AI-powered crop recommendation and agricultural decision support using soil, weather, market, suitability and risk analysis.">
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://smart-agriculture-dss.onrender.com">
+        <meta property="og:image" content="https://smart-agriculture-dss.onrender.com/icon-512.png">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Smart Agriculture | AI Crop Recommendation System">
+        <meta name="twitter:description" content="AI-powered crop recommendation and agricultural decision support using soil, weather, market, suitability and risk analysis.">
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          "name": "Smart Agriculture",
+          "applicationCategory": "AgricultureApplication",
+          "operatingSystem": "Web",
+          "description": "AI-powered crop recommendation and agricultural decision support system using soil, weather, market, suitability and risk analysis.",
+          "url": "https://smart-agriculture-dss.onrender.com"
+        }
+        </script>
         <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./service-worker.js').catch(function(err) {
@@ -699,18 +728,21 @@ def get_weather_emoji(condition: str) -> str:
 
 
 def render_hero_banner():
-    """Render an attractive animated hero section."""
+    """Render an attractive animated hero section with SEO optimization."""
     html = """
     <div class="ag-hero-container">
         <div class="ag-hero-badge">🌱 SMART AGRICULTURE INTELLIGENCE</div>
-        <div class="ag-hero-title">Decision Intelligence for Better Farming</div>
-        <p class="ag-hero-subtitle">Real-Time AI Multi-Factor Analytics: Soil Screening + Live Weather + Market Pricing + Machine Learning Risk Engine</p>
+        <h1 class="ag-hero-title" style="margin: 0; padding: 0;">Smart Agriculture</h1>
+        <h2 class="ag-hero-subtitle" style="margin-top: 6px; font-size: 1.15rem; font-weight: 600; color: #a7f3d0;">AI-Powered Crop Recommendation & Agricultural Decision Support</h2>
+        <p class="ag-hero-subtitle" style="font-size: 0.92rem; color: #9ca3af; margin-top: 8px; max-width: 900px;">
+            Integrated decision intelligence analyzing soil nutrient balance, soil health scoring, live weather forecasts, APMC market pricing, crop suitability, and multi-variable agricultural risk assessment.
+        </p>
         <div class="ag-hero-pills">
-            <span class="ag-pill">🧪 Soil Analysis</span>
-            <span class="ag-pill">☀️ Live Weather</span>
-            <span class="ag-pill">🤖 RandomForest AI</span>
-            <span class="ag-pill">💰 ROI & Market Economics</span>
-            <span class="ag-pill">⚖️ Risk Assessment</span>
+            <span class="ag-pill">🧪 Soil Health Analysis</span>
+            <span class="ag-pill">☀️ Live Weather Integration</span>
+            <span class="ag-pill">🤖 Machine Learning Classifier</span>
+            <span class="ag-pill">💰 ROI & Market Pricing</span>
+            <span class="ag-pill">⚖️ Agricultural Risk Analysis</span>
         </div>
     </div>
     """
