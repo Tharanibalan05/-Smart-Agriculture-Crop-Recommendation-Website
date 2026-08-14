@@ -60,6 +60,10 @@ def wmo_code_to_condition(code: int) -> str:
         return "Clear Sky"
 
 
+import functools
+
+
+@functools.lru_cache(maxsize=128)
 def search_locations(query: str) -> list[dict]:
     """Search Indian locations using Open-Meteo geocoding API for live autocomplete.
 

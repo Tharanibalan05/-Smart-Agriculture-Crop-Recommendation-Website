@@ -30,23 +30,12 @@ from utils import (
     load_user_history,
     clear_user_history,
 )
-import importlib
 import config
 import weather_service
 import soil_analysis
 import market_service
 import risk_engine
 import report_generator
-
-try:
-    importlib.reload(config)
-    importlib.reload(weather_service)
-    importlib.reload(soil_analysis)
-    importlib.reload(market_service)
-    importlib.reload(risk_engine)
-    importlib.reload(report_generator)
-except Exception:
-    pass
 
 from weather_service import (
     get_coordinates,
@@ -671,16 +660,6 @@ if 'manual_weather' not in st.session_state:
 
 if 'last_results' not in st.session_state:
     st.session_state['last_results'] = None
-
-
-@st.cache_data(ttl=WEATHER_CACHE_TTL)
-def cached_get_current_weather(lat: float, lon: float):
-    return get_current_weather(lat, lon)
-
-
-@st.cache_data(ttl=FORECAST_CACHE_TTL)
-def cached_get_weather_forecast(lat: float, lon: float):
-    return get_weather_forecast(lat, lon)
 
 
 @st.cache_data(ttl=604800)
@@ -1950,8 +1929,12 @@ def page_crop_recommendation():
             actual_rainfall = float(w_rain)
             weights = get_normalized_weights()
             classes = model.classes_
+            classes_list = list(classes)
 
-            recommendation_rows = []
+            # 1. Batch Feature Vector Construction for All Crop Candidates
+            feature_matrix = []
+            crop_meta_list = []
+
             for crop_raw in classes:
                 crop_name = str(crop_raw).strip().title()
                 crop_min_water = float(get_crop_min_water_requirement(crop_name))
@@ -1964,21 +1947,39 @@ def page_crop_recommendation():
                     crop_effective_rainfall = actual_rainfall
                     crop_irrigation_adjusted = False
 
-                # Construct crop-specific feature vector
-                crop_features = pd.DataFrame(
-                    [[N, P, K, float(w_temp), float(w_hum), float(ph), float(crop_effective_rainfall)]],
-                    columns=["N", "P", "K", "temperature", "humidity", "ph", "rainfall"],
-                )
+                feature_matrix.append([N, P, K, float(w_temp), float(w_hum), float(ph), float(crop_effective_rainfall)])
+                crop_meta_list.append({
+                    'raw': crop_raw,
+                    'name': crop_name,
+                    'min_water': crop_min_water,
+                    'effective_rainfall': crop_effective_rainfall,
+                    'irrigation_adjusted': crop_irrigation_adjusted,
+                })
 
-                # ML Predictions under crop-specific effective water supply
-                probs_vec = model.predict_proba(crop_features)[0]
-                crop_idx = list(classes).index(crop_raw)
-                conf = float(probs_vec[crop_idx])
+            # Single Batch Scikit-Learn Random Forest Prediction for All 22 Crops
+            batch_df = pd.DataFrame(
+                feature_matrix,
+                columns=["N", "P", "K", "temperature", "humidity", "ph", "rainfall"],
+            )
+            probs_matrix = model.predict_proba(batch_df)
 
-                # Economic data
-                econ_data, econ_status = get_crop_profit_data(crop_name)
+            recommendation_rows = []
 
-                # Live vs Demo Market lookup
+            for idx, meta in enumerate(crop_meta_list):
+                crop_raw = meta['raw']
+                crop_name = meta['name']
+                crop_min_water = meta['min_water']
+                crop_effective_rainfall = meta['effective_rainfall']
+                crop_irrigation_adjusted = meta['irrigation_adjusted']
+
+                crop_idx = classes_list.index(crop_raw)
+                conf = float(probs_matrix[idx, crop_idx])
+
+                # Fast Cached Economic Data Lookup
+                econ_raw, econ_status = get_crop_profit_data(crop_name)
+                econ_data = dict(econ_raw)
+
+                # Fast Cached Market Price Lookup
                 market_price, market_status = get_market_price_for_crop(crop_name, current_loc)
                 if market_status == MarketDataStatus.LIVE and market_price is not None:
                     econ_data['market_price'] = market_price
@@ -1989,7 +1990,7 @@ def page_crop_recommendation():
                     econ_data['profit_margin'] = (econ_data['profit'] / econ_data['revenue'] * 100.0) if econ_data['revenue'] > 0 else 0.0
                     econ_data['breakeven_yield'] = round(econ_data['cost'] / market_price, 1) if market_price > 0 else None
 
-                # Risk computation using crop-specific effective rainfall
+                # Risk Computation using Crop-Specific Effective Rainfall
                 weather_dict = {
                     'temperature': w_temp,
                     'humidity': w_hum,
@@ -2600,7 +2601,10 @@ def page_reports():
     ts = res.get('timestamp')
 
     csv_bytes = build_report(location=loc, weather=weather, soil=soil, best=best, alternatives=alts)
-    pdf_bytes = build_pdf_report(location=loc, weather=weather, soil=soil, inputs=inputs, best=best, alternatives=alts, timestamp=ts)
+
+    if 'pdf_bytes' not in res:
+        res['pdf_bytes'] = build_pdf_report(location=loc, weather=weather, soil=soil, inputs=inputs, best=best, alternatives=alts, timestamp=ts)
+    pdf_bytes = res['pdf_bytes']
     wa_url = build_whatsapp_share_url(location=loc, weather=weather, soil=soil, best=best)
 
     st.markdown("### 📥 Export & Share Options")

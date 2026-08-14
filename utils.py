@@ -45,6 +45,10 @@ def is_season_valid(season_name, month=None):
     return month in months
 
 
+import functools
+
+
+@functools.lru_cache(maxsize=128)
 def get_crop_profit_data(crop_name, prefer_live=False):
     """Look up economics for a predicted crop.
 
@@ -101,7 +105,7 @@ def get_crop_profit_data(crop_name, prefer_live=False):
         "breakeven_yield": breakeven,
         "profit_status": "Profit" if profit > 0 else ("Break-even" if profit == 0 else "Loss"),
     }
-    return (econ, "LOCAL")
+    return (dict(econ), "LOCAL")
 
 
 def get_breakeven_yield(crop_name):
@@ -139,9 +143,11 @@ def _normalize_history_file():
     try:
         # Try clean read first
         df = pd.read_csv(HISTORY_PATH)
-        for col in HISTORY_COLUMNS:
-            if col not in df.columns:
-                df[col] = None
+        if list(df.columns) == HISTORY_COLUMNS:
+            return
+        missing_cols = [col for col in HISTORY_COLUMNS if col not in df.columns]
+        for col in missing_cols:
+            df[col] = None
         df = df[HISTORY_COLUMNS]
         df.to_csv(HISTORY_PATH, index=False)
     except Exception:

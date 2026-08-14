@@ -150,6 +150,10 @@ except Exception:
         return get_market_price(crop_name, state_name=state_name)
 
 
+import functools
+
+
+@functools.lru_cache(maxsize=128)
 def _read_local_price(crop_name: str) -> float:
     """Read demo market price per kg from crop_economics.csv."""
     try:

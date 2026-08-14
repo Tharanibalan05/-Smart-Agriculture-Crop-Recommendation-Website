@@ -21,8 +21,14 @@ def get_db_connection():
     return conn
 
 
+_DB_INITIALIZED = False
+
 def init_db():
     """Initialize the users table if it does not exist and ensure schema is up to date."""
+    global _DB_INITIALIZED
+    if _DB_INITIALIZED:
+        return
+
     with get_db_connection() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -41,6 +47,7 @@ def init_db():
         if "password_needs_reset" not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN password_needs_reset INTEGER DEFAULT 0")
         conn.commit()
+    _DB_INITIALIZED = True
 
 
 def hash_password(password: str) -> str:
