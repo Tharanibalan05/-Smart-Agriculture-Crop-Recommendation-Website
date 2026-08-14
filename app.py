@@ -805,6 +805,45 @@ def get_current_user():
     }
 
 
+def require_authentication() -> bool:
+    """Centralized authentication guard for protected pages.
+
+    Returns True if user is authenticated (via local bcrypt login or Google OAuth).
+    Otherwise renders a clean access restriction notice and halts execution to prevent
+    unauthorized data access, ML model execution, or API calls.
+    """
+    user_info = get_current_user()
+    if user_info and user_info.get("is_logged_in"):
+        return True
+
+    # Render clean unauthenticated access warning
+    st.warning("🔐 Please sign in to access this feature.")
+
+    st.markdown("""
+        <div class="empty-state-card" style="border-color: rgba(239, 68, 68, 0.4);">
+            <div class="empty-state-icon">🔒</div>
+            <h3 class="empty-state-title">Authentication Required</h3>
+            <p class="empty-state-sub">
+                This section contains decision intelligence tools, historical data, or analytical engines.
+                Please sign in with your email account or Google OAuth to continue.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns([1, 2, 1])
+    with c2:
+        if st.button("🔑 Go to Sign In", use_container_width=True, type="primary", key="auth_guard_login_btn"):
+            st.session_state["nav_choice"] = "🔑 Sign In"
+            st.rerun()
+
+    render_app_footer()
+    try:
+        st.stop()
+    except Exception:
+        pass
+    return False
+
+
 def get_user_avatar_color(identifier: str) -> str:
     """Generate a deterministic HSL color string based on user name/email hash."""
     import hashlib
@@ -1034,6 +1073,42 @@ with st.sidebar:
         color: #4b5563;
         margin-top: 2px;
     }
+
+    /* WhatsApp Share Button Styling */
+    .whatsapp-share-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        width: 100% !important;
+        height: 42px !important;
+        background-color: rgba(37, 211, 102, 0.12) !important;
+        color: #25D366 !important;
+        border: 1px solid rgba(37, 211, 102, 0.4) !important;
+        border-radius: 12px !important;
+        padding: 0 16px !important;
+        font-size: 0.9rem !important;
+        font-weight: 700 !important;
+        text-decoration: none !important;
+        box-shadow: 0 4px 12px rgba(37, 211, 102, 0.15) !important;
+        transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        box-sizing: border-box !important;
+    }
+    .whatsapp-share-btn:hover {
+        background-color: #25D366 !important;
+        color: #ffffff !important;
+        border-color: #25D366 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 20px rgba(37, 211, 102, 0.35) !important;
+    }
+    .whatsapp-share-btn:hover .whatsapp-btn-svg path {
+        fill: #ffffff !important;
+    }
+    .whatsapp-btn-svg {
+        flex-shrink: 0 !important;
+        vertical-align: middle !important;
+        transition: fill 0.18s ease !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -1082,21 +1157,30 @@ with st.sidebar:
 
     st.markdown('<hr style="margin: 10px 0 14px 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.12);" />', unsafe_allow_html=True)
 
-    # Navigation menu
-    nav_options = [
-        "🔑 Sign In",
-        "🏠 Dashboard",
-        "🌾 Crop Recommendation",
-        "🧪 Soil Analysis",
-        "💰 Profit Analysis",
-        "📊 Crop Comparison",
-        "📜 Prediction History",
-        "📄 Reports",
-        "ℹ️ About",
-    ]
+    # Dynamic navigation menu filtering based on authentication status
+    if is_logged_in:
+        nav_options = [
+            "🏠 Dashboard",
+            "🌾 Crop Recommendation",
+            "🧪 Soil Analysis",
+            "💰 Profit Analysis",
+            "📊 Crop Comparison",
+            "📜 Prediction History",
+            "📄 Reports",
+            "ℹ️ About",
+        ]
+    else:
+        nav_options = [
+            "🔑 Sign In",
+            "ℹ️ About",
+        ]
 
-    saved_nav = st.session_state.get("nav_choice", "🔑 Sign In")
-    default_index = nav_options.index(saved_nav) if saved_nav in nav_options else 0
+    saved_nav = st.session_state.get("nav_choice")
+    if not saved_nav or saved_nav not in nav_options:
+        saved_nav = nav_options[0]
+        st.session_state["nav_choice"] = saved_nav
+
+    default_index = nav_options.index(saved_nav)
 
     nav_choice = st.radio(
         "Navigation",
@@ -1558,6 +1642,8 @@ def page_login():
 # PAGE: 🌾 CROP RECOMMENDATION
 # -------------------------------------------------------------------
 def page_crop_recommendation():
+    if not require_authentication():
+        return
     render_hero_banner()
 
     st.header("🌾 Crop Recommendation Engine")
@@ -1814,7 +1900,19 @@ def page_crop_recommendation():
     with s_ext3:
         land_size = st.number_input("Land Area (Acres)", min_value=0.1, max_value=1000.0, value=1.0, step=0.5)
     with s_ext4:
-        top_n = st.slider("Top Candidates Count", min_value=1, max_value=5, value=5)
+        current_top_count = int(st.session_state.get("top_candidates_count", 5))
+        if current_top_count < 3 or current_top_count > 20:
+            current_top_count = 5
+        top_n = st.slider(
+            "Top Candidates Count",
+            min_value=3,
+            max_value=20,
+            value=current_top_count,
+            step=1,
+            key="top_candidates_count_slider",
+            help="Select between 3 and 20 top recommended crop candidates to evaluate."
+        )
+        st.session_state["top_candidates_count"] = top_n
 
     # Input Validation Warnings
     if N > 250 or P > 150 or K > 250:
@@ -1843,7 +1941,7 @@ def page_crop_recommendation():
     # STEP 4: GENERATE DECISION SUPPORT RECOMMENDATIONS
     st.subheader("4. Execute Decision Support Analysis")
 
-    if st.button("🚀 Generate Top-5 Crop Recommendations", type="primary", use_container_width=True):
+    if st.button(f"🚀 Generate Top-{top_n} Crop Recommendations", type="primary", use_container_width=True):
         if not MODEL_LOADED:
             st.error("Cannot proceed: ML model is missing or failed to load.")
             st.stop()
@@ -2231,6 +2329,8 @@ def page_crop_recommendation():
 # PAGE: 🏠 DASHBOARD
 # -------------------------------------------------------------------
 def page_dashboard():
+    if not require_authentication():
+        return
     render_hero_banner()
 
     st.header("🏠 Decision Support Overview Dashboard")
@@ -2276,6 +2376,8 @@ def page_dashboard():
 # PAGE: 🧪 SOIL ANALYSIS
 # -------------------------------------------------------------------
 def page_soil_analysis():
+    if not require_authentication():
+        return
     render_hero_banner()
 
     st.header("🧪 Soil Screening & Nutrients Analysis")
@@ -2319,6 +2421,8 @@ def page_soil_analysis():
 # PAGE: 💰 PROFIT ANALYSIS
 # -------------------------------------------------------------------
 def page_profit_analysis():
+    if not require_authentication():
+        return
     render_hero_banner()
 
     st.header("💰 Crop Economics & Profitability Analysis")
@@ -2352,6 +2456,8 @@ def page_profit_analysis():
 # PAGE: 📊 CROP COMPARISON
 # -------------------------------------------------------------------
 def page_crop_comparison():
+    if not require_authentication():
+        return
     render_hero_banner()
 
     st.header("📊 Top Candidate Crops Comprehensive Matrix")
@@ -2392,6 +2498,8 @@ def page_crop_comparison():
 # PAGE: 📜 PREDICTION HISTORY
 # -------------------------------------------------------------------
 def page_prediction_history():
+    if not require_authentication():
+        return
     render_hero_banner()
 
     st.header("📜 Saved Prediction History")
@@ -2454,6 +2562,8 @@ def page_prediction_history():
 # PAGE: 📄 REPORTS
 # -------------------------------------------------------------------
 def page_reports():
+    if not require_authentication():
+        return
     render_hero_banner()
 
     st.header("📄 Agricultural Decision Support Reports")
@@ -2515,13 +2625,17 @@ def page_reports():
         )
 
     with exp_col3:
-        if hasattr(st, "link_button"):
-            st.link_button("📱 Share via WhatsApp", url=wa_url, use_container_width=True)
-        else:
-            st.markdown(
-                f'<a href="{wa_url}" target="_blank" style="display:inline-block;width:100%;text-align:center;padding:0.5rem 1rem;background-color:#25D366;color:white;text-decoration:none;border-radius:0.5rem;font-weight:600;">📱 Share via WhatsApp</a>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f"""
+            <a href="{wa_url}" target="_blank" rel="noopener noreferrer" class="whatsapp-share-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#25D366" class="whatsapp-btn-svg">
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.572-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                </svg>
+                <span>Share via WhatsApp</span>
+            </a>
+            """,
+            unsafe_allow_html=True,
+        )
 
     render_app_footer()
 
@@ -2580,7 +2694,20 @@ def page_about():
     render_app_footer()
 
 
+PROTECTED_PAGES = {
+    "🏠 Dashboard",
+    "🌾 Crop Recommendation",
+    "🧪 Soil Analysis",
+    "💰 Profit Analysis",
+    "📊 Crop Comparison",
+    "📜 Prediction History",
+    "📄 Reports",
+}
+
 # --- Route Selection ---
+if nav_choice in PROTECTED_PAGES:
+    require_authentication()
+
 if nav_choice == "🔑 Sign In":
     page_login()
 elif nav_choice == "🏠 Dashboard":

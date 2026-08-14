@@ -1,5 +1,3 @@
-﻿# Streamlit Configuration File
-
 [server]
 headless = true
 
