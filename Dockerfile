@@ -22,10 +22,10 @@ COPY app.py auth_db.py utils.py config.py ./
 COPY weather_service.py market_service.py soil_analysis.py risk_engine.py report_generator.py ./
 COPY crop_model.pkl crop_economics.csv crop_recommendation_*.csv ./
 COPY manifest.json service-worker.js icon-*.png ./
-COPY data/ ./data/
 
-# Create a non-root user for container execution safety
-RUN useradd -m -u 1000 appuser && \
+# Create runtime data directory and non-root user for container execution safety
+RUN mkdir -p /app/data && \
+    useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
