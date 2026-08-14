@@ -2,14 +2,48 @@
 Central configuration for decision-support weights and feature toggles.
 Do not store API keys here; use environment variables instead.
 """
+import math
 import os
 
 MODEL_PATH = os.getenv('MODEL_PATH', 'crop_model.pkl')
 
+
+def _safe_float_env(env_var: str, default_val: float, min_val: float = 0.0, max_val: float = 1.0) -> float:
+    """Safely parse a float from an environment variable without crashing or leaking raw variable values."""
+    raw_val = os.getenv(env_var)
+    if raw_val is None or str(raw_val).strip() == "":
+        return default_val
+    try:
+        val = float(raw_val)
+        if math.isnan(val) or math.isinf(val):
+            return default_val
+        if min_val is not None and val < min_val:
+            return default_val
+        if max_val is not None and val > max_val:
+            return default_val
+        return val
+    except (ValueError, TypeError):
+        return default_val
+
+
+def _safe_int_env(env_var: str, default_val: int, min_val: int = 1) -> int:
+    """Safely parse an int from an environment variable."""
+    raw_val = os.getenv(env_var)
+    if raw_val is None or str(raw_val).strip() == "":
+        return default_val
+    try:
+        val = int(raw_val)
+        if min_val is not None and val < min_val:
+            return default_val
+        return val
+    except (ValueError, TypeError):
+        return default_val
+
+
 # Weather cache TTL in seconds (used in Streamlit caching in app where appropriate)
-WEATHER_CACHE_TTL = int(os.getenv('WEATHER_CACHE_TTL', '600'))  # 10 minutes
+WEATHER_CACHE_TTL = _safe_int_env('WEATHER_CACHE_TTL', 600, min_val=1)  # 10 minutes
 # Forecast cache TTL (longer than current weather)
-FORECAST_CACHE_TTL = int(os.getenv('FORECAST_CACHE_TTL', '1800'))  # 30 minutes
+FORECAST_CACHE_TTL = _safe_int_env('FORECAST_CACHE_TTL', 1800, min_val=1)  # 30 minutes
 
 # Whether UI should allow manual weather fallback when live weather fails
 WEATHER_FALLBACK_ALLOWED = True
@@ -17,17 +51,17 @@ WEATHER_FALLBACK_ALLOWED = True
 # Effective rainfall floor (mm) when reliable irrigation (Canal, Borewell, Drip/Sprinkler) is present.
 # Note: This is an illustrative heuristic floor to adjust model inputs when natural rainfall is low,
 # not a scientifically derived agronomic figure, and can be configured as needed.
-IRRIGATION_EFFECTIVE_RAINFALL_MM = float(os.getenv('IRRIGATION_EFFECTIVE_RAINFALL_MM', '150.0'))
+IRRIGATION_EFFECTIVE_RAINFALL_MM = _safe_float_env('IRRIGATION_EFFECTIVE_RAINFALL_MM', 150.0, min_val=0.0, max_val=10000.0)
 
 # Decision weights (explainable and configurable)
 # Default weights sum to exactly 1.0 (0.35 + 0.20 + 0.15 + 0.05 + 0.15 + 0.10 = 1.00)
 DECISION_WEIGHTS = {
-    'model': float(os.getenv('WEIGHT_MODEL', 0.35)),
-    'soil': float(os.getenv('WEIGHT_SOIL', 0.20)),
-    'weather': float(os.getenv('WEIGHT_WEATHER', 0.15)),
-    'season': float(os.getenv('WEIGHT_SEASON', 0.05)),
-    'profit': float(os.getenv('WEIGHT_PROFIT', 0.15)),
-    'risk': float(os.getenv('WEIGHT_RISK', 0.10)),
+    'model': _safe_float_env('WEIGHT_MODEL', 0.35),
+    'soil': _safe_float_env('WEIGHT_SOIL', 0.20),
+    'weather': _safe_float_env('WEIGHT_WEATHER', 0.15),
+    'season': _safe_float_env('WEIGHT_SEASON', 0.05),
+    'profit': _safe_float_env('WEIGHT_PROFIT', 0.15),
+    'risk': _safe_float_env('WEIGHT_RISK', 0.10),
 }
 
 
