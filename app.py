@@ -1903,16 +1903,36 @@ def page_crop_recommendation():
     soil_report = analyze_soil(N=N, P=P, K=K, ph=ph, soil_type=soil_type)
 
     with st.expander("🧪 Immediate Soil Health Screening Preview", expanded=True):
-        sc_col1, sc_col2 = st.columns([1, 3])
+        sc_col1, sc_col2 = st.columns([1, 2])
         with sc_col1:
-            st.metric("Soil Health Score", f"{soil_report['score']}/100")
+            st.metric("Soil Health Score", f"{soil_report['score']} / 100", delta=f"Status: {soil_report.get('category', 'Good')}")
             st.progress(float(soil_report['score']) / 100.0)
+            st.caption(f"Category: **{soil_report.get('category', 'Good')}**")
+
         with sc_col2:
-            st.markdown(f"**Status Overview:** {', '.join(soil_report['details'])}")
-            if soil_report['deficiencies']:
-                st.markdown(f"**Deficiencies:** {', '.join(soil_report['deficiencies'])}")
-            if soil_report['recommendations']:
-                st.markdown(f"**Fertilizer Guidance:** {', '.join(soil_report['recommendations'])}")
+            st.markdown("#### 📊 Parameter Score Breakdown")
+            bd = soil_report.get('score_breakdown', {})
+            if bd:
+                bd_data = [
+                    {"Parameter": param, "Points Earned": f"{data['score']} / {data['max']}"}
+                    for param, data in bd.items()
+                ]
+                bd_data.append({"Parameter": "**Total Score**", "Points Earned": f"**{sum(d['score'] for d in bd.values()):.2f} / 100**"})
+                st.table(bd_data)
+            else:
+                st.markdown(f"**Status Overview:** {', '.join(soil_report['details'])}")
+
+        st.markdown("---")
+        st_c1, st_c2 = st.columns(2)
+        with st_c1:
+            if soil_report.get('deficiencies'):
+                st.markdown(f"**⚠️ Identified Deficiencies:** {', '.join(soil_report['deficiencies'])}")
+            else:
+                st.markdown("**✅ Deficiencies:** None identified (Optimal balance).")
+        with st_c2:
+            if soil_report.get('recommendations'):
+                st.markdown(f"**💡 Agronomic Guidance:** {', '.join(soil_report['recommendations'])}")
+
         st.caption(f"ℹ️ {soil_report['disclaimer']}")
 
     st.markdown("---")
@@ -1925,7 +1945,8 @@ def page_crop_recommendation():
             st.error("Cannot proceed: ML model is missing or failed to load.")
             st.stop()
 
-        with st.spinner("Analyzing soil nutrients, live weather, market pricing, crop suitability & risk factors..."):
+        with st.spinner("Analyzing your farm conditions and preparing the best crop recommendations..."):
+            t_rec_start = time.perf_counter()
             actual_rainfall = float(w_rain)
             weights = get_normalized_weights()
             classes = model.classes_
@@ -1957,15 +1978,19 @@ def page_crop_recommendation():
                 })
 
             # Single Batch Scikit-Learn Random Forest Prediction for All 22 Crops
+            t_ml_start = time.perf_counter()
             batch_df = pd.DataFrame(
                 feature_matrix,
                 columns=["N", "P", "K", "temperature", "humidity", "ph", "rainfall"],
             )
             probs_matrix = model.predict_proba(batch_df)
+            t_ml_dur = (time.perf_counter() - t_ml_start) * 1000.0
 
             # Pre-fetch bulk state market prices in ONE single API request (or 0 requests if cached)
+            t_mkt_start = time.perf_counter()
             state_name = current_loc.get('state') if (current_loc and isinstance(current_loc, dict)) else None
             bulk_market_map = cached_get_bulk_market_prices(state_name=state_name)
+            t_mkt_dur = (time.perf_counter() - t_mkt_start) * 1000.0
 
             recommendation_rows = []
 
@@ -2082,6 +2107,9 @@ def page_crop_recommendation():
                 df_recs = pd.DataFrame(eligible_rows)
             else:
                 df_recs = df_all.head(top_n)
+
+            t_rec_dur = (time.perf_counter() - t_rec_start) * 1000.0
+            print(f"[PERF] Bulk Market Fetch: {t_mkt_dur:.2f} ms | Batch ML Inference: {t_ml_dur:.2f} ms | Total Recommendation Analysis: {t_rec_dur:.2f} ms")
 
             for new_idx in range(len(df_recs)):
                 rank_badge = f"🥇 #{new_idx + 1} Recommended" if new_idx == 0 else f"#{new_idx + 1}"

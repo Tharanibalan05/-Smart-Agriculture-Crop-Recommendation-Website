@@ -254,12 +254,21 @@ def get_market_price_for_crop(crop_name: str, location_meta: dict = None, preloa
         state_name = location_meta.get('state')
 
     # Check preloaded bulk market map first
-    if preloaded_map and isinstance(preloaded_map, dict):
-        live_info = preloaded_map.get(crop_name.title())
-        if live_info and live_info.get("price_per_kg"):
-            return (live_info["price_per_kg"], MarketDataStatus.LIVE)
+    if preloaded_map is not None:
+        if isinstance(preloaded_map, dict):
+            live_info = preloaded_map.get(crop_name.title())
+            if live_info and live_info.get("price_per_kg"):
+                return (live_info["price_per_kg"], MarketDataStatus.LIVE)
 
-    # Try live price lookup
+        # When preloaded_map is provided, do NOT fall back to individual network API calls.
+        # Immediately return local demo price or UNAVAILABLE.
+        demo_price = _read_local_price(crop_name)
+        if demo_price is not None:
+            return (demo_price, MarketDataStatus.DEMO)
+
+        return (None, MarketDataStatus.UNAVAILABLE)
+
+    # Standalone single-crop live price lookup (when preloaded_map is None)
     live_info = cached_get_market_price(crop_name, state_name=state_name)
     if live_info and live_info.get("price_per_kg"):
         return (live_info["price_per_kg"], MarketDataStatus.LIVE)
