@@ -1,0 +1,15 @@
+﻿.git
+.gitignore
+.env
+.env.*
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+venv/
+.venv/
+data/users.db
+prediction_history.csv
+logs/
+*.log
+scratch/
+test_*.py

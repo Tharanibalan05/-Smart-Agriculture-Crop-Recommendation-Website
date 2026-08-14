@@ -1,8 +1,6 @@
-# Streamlit Configuration File
-# Pins server port to 8501 permanently to match Google OAuth Redirect URI (http://localhost:8501/oauth2callback)
+﻿# Streamlit Configuration File
 
 [server]
-port = 8501
 headless = true
 
 [browser]
