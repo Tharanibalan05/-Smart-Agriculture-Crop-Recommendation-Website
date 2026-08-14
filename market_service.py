@@ -138,6 +138,70 @@ def get_market_price(crop_name: str, state_name: str = None) -> dict:
         return None
 
 
+def get_bulk_market_prices(state_name: str = None) -> dict:
+    """Fetch all mandi market prices for a state (or national) in ONE single API request.
+
+    Returns dict mapping crop_name (Title case) -> dict of market info, or {} if failed/no key.
+    """
+    api_key = get_market_api_key()
+    if not api_key:
+        return {}
+
+    api_url = os.getenv("MARKET_API_URL") or AGMARKNET_API_BASE
+    params = {
+        "api-key": api_key,
+        "format": "json",
+        "limit": 500,
+    }
+    if state_name:
+        params["filters[state]"] = state_name
+
+    try:
+        resp = requests.get(api_url, params=params, timeout=3)
+        if resp.status_code != 200:
+            return {}
+        data = resp.json()
+        records = data.get("records", [])
+        if not records:
+            return {}
+
+        commodity_to_crop = {v.lower(): k for k, v in CROP_COMMODITY_MAP.items()}
+
+        price_map = {}
+        for rec in records:
+            comm = str(rec.get("commodity", "")).strip().lower()
+            crop_name = commodity_to_crop.get(comm)
+            if not crop_name:
+                for c_name in CROP_COMMODITY_MAP:
+                    if c_name.lower() in comm or comm in c_name.lower():
+                        crop_name = c_name
+                        break
+            if not crop_name or crop_name in price_map:
+                continue
+
+            raw_modal = rec.get("modal_price")
+            if raw_modal:
+                try:
+                    modal_p = float(raw_modal)
+                    if modal_p > 0:
+                        price_kg = round(modal_p / 100.0, 2)
+                        price_map[crop_name.title()] = {
+                            "price_per_kg": price_kg,
+                            "modal_price_quintal": modal_p,
+                            "market": rec.get("market", "APMC Market"),
+                            "state": rec.get("state", state_name or "India"),
+                            "district": rec.get("district", "N/A"),
+                            "arrival_date": rec.get("arrival_date", "Today"),
+                            "commodity": rec.get("commodity", comm),
+                            "source": "data.gov.in Agmarknet",
+                        }
+                except ValueError:
+                    continue
+        return price_map
+    except Exception:
+        return {}
+
+
 # Streamlit Caching Wrapper (1 Hour TTL)
 try:
     import streamlit as st
@@ -145,9 +209,16 @@ try:
     @st.cache_data(ttl=3600)
     def cached_get_market_price(crop_name: str, state_name: str = None):
         return get_market_price(crop_name, state_name=state_name)
+
+    @st.cache_data(ttl=3600)
+    def cached_get_bulk_market_prices(state_name: str = None):
+        return get_bulk_market_prices(state_name=state_name)
 except Exception:
     def cached_get_market_price(crop_name: str, state_name: str = None):
         return get_market_price(crop_name, state_name=state_name)
+
+    def cached_get_bulk_market_prices(state_name: str = None):
+        return get_bulk_market_prices(state_name=state_name)
 
 
 import functools
@@ -171,7 +242,7 @@ def _read_local_price(crop_name: str) -> float:
         return None
 
 
-def get_market_price_for_crop(crop_name: str, location_meta: dict = None):
+def get_market_price_for_crop(crop_name: str, location_meta: dict = None, preloaded_map: dict = None):
     """Retrieve market price for crop.
 
     Returns tuple: (price_per_kg, MarketDataStatus)
@@ -181,6 +252,12 @@ def get_market_price_for_crop(crop_name: str, location_meta: dict = None):
     state_name = None
     if location_meta and isinstance(location_meta, dict):
         state_name = location_meta.get('state')
+
+    # Check preloaded bulk market map first
+    if preloaded_map and isinstance(preloaded_map, dict):
+        live_info = preloaded_map.get(crop_name.title())
+        if live_info and live_info.get("price_per_kg"):
+            return (live_info["price_per_kg"], MarketDataStatus.LIVE)
 
     # Try live price lookup
     live_info = cached_get_market_price(crop_name, state_name=state_name)

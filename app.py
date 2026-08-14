@@ -46,7 +46,7 @@ from weather_service import (
     reverse_geocode,
 )
 from soil_analysis import analyze_soil, INDIAN_SOIL_TYPES
-from market_service import get_market_price_for_crop, MarketDataStatus
+from market_service import get_market_price_for_crop, MarketDataStatus, cached_get_bulk_market_prices
 from risk_engine import compute_risk
 from report_generator import build_report, build_pdf_report, build_whatsapp_share_url
 from auth_db import register_user, verify_user, init_db
@@ -1963,6 +1963,10 @@ def page_crop_recommendation():
             )
             probs_matrix = model.predict_proba(batch_df)
 
+            # Pre-fetch bulk state market prices in ONE single API request (or 0 requests if cached)
+            state_name = current_loc.get('state') if (current_loc and isinstance(current_loc, dict)) else None
+            bulk_market_map = cached_get_bulk_market_prices(state_name=state_name)
+
             recommendation_rows = []
 
             for idx, meta in enumerate(crop_meta_list):
@@ -1980,7 +1984,7 @@ def page_crop_recommendation():
                 econ_data = dict(econ_raw)
 
                 # Fast Cached Market Price Lookup
-                market_price, market_status = get_market_price_for_crop(crop_name, current_loc)
+                market_price, market_status = get_market_price_for_crop(crop_name, current_loc, preloaded_map=bulk_market_map)
                 if market_status == MarketDataStatus.LIVE and market_price is not None:
                     econ_data['market_price'] = market_price
                     econ_data['revenue'] = market_price * econ_data['yield']
